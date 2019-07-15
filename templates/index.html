@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TJUPT Invite Tree</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@4.2.1/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.2.1/dist/jquery.min.js"></script>
+    <style>
+        html,
+        body {
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+
+        .outer {
+            height: 100%;
+            padding: 25px 0 0;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        .input_box {
+            height: 25px;
+            background: #BBE8F2;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+<div class="outer">
+    <div class="input_box">
+        <label for="uid">UID：</label><input type="number" id="uid" placeholder="uid">
+        或
+        <label for="username">用户名：</label><input type="text" id="username" placeholder="username">
+        <button onclick="drawAnother()">快画</button>
+        （UID和用户名同时填写时取UID）(大树会导致浏览器/电脑卡顿甚至卡死，慎画）(高隐私等级未列入）
+    </div>
+
+    <div id="echarts">{{ msg }}</div>
+</div>
+<script>
+    function drawAnother() {
+        let uid = $('#uid').val();
+        if (!uid) {
+            uid = 0;
+        }
+        const username = $('#username').val();
+        window.location.href = "/?" + 'uid=' + uid + '&username=' + username;
+    }
+
+    function arrayToJson(treeArray) {
+        let r = [];
+        let tmpMap = {};
+
+        for (let i = 0, l = treeArray.length; i < l; i++) {
+            if (treeArray[i]['alive'] === 1) {
+                treeArray[i]['symbol'] = "emptyCircle"
+            } else {
+                treeArray[i]['symbol'] = "image://data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAsAAAALCAYAAACprHcmAAABhGlDQ1BJQ0MgcHJvZmlsZQAAKJF9kT1Iw0AcxV9bpSqVDnYo0iFDdbIgKuKoVShChVArtOpgcukXNGlIUlwcBdeCgx+LVQcXZ10dXAVB8APExdVJ0UVK/F9SaBHjwXE/3t173L0D/M0qU82ecUDVLCOTSgq5/KoQfEUQYfQjipjETH1OFNPwHF/38PH1LsGzvM/9OQaVgskAn0A8y3TDIt4gnt60dM77xBFWlhTic+Ixgy5I/Mh12eU3ziWH/TwzYmQz88QRYqHUxXIXs7KhEk8RxxVVo3x/zmWF8xZntVpn7XvyF4YK2soy12nGkMIiliBCgIw6KqjCQoJWjRQTGdpPeviHHb9ILplcFTByLKAGFZLjB/+D392axckJNymUBHpfbPtjBAjuAq2GbX8f23brBAg8A1dax19rAjOfpDc6WvwICG8DF9cdTd4DLneA6JMuGZIjBWj6i0Xg/Yy+KQ8M3QIDa25v7X2cPgBZ6ip9AxwcAqMlyl73eHdfd2//nmn39wM3BXKPAtgpFQAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAAuIwAALiMBeKU/dgAAAAd0SU1FB+MHDwkkBqEdcNYAAAAZdEVYdENvbW1lbnQAQ3JlYXRlZCB3aXRoIEdJTVBXgQ4XAAABN0lEQVQY02WQMUtCARSFPx8RlSgRSoVDg6iBTUZDWYuGW0INUdIShLQUUYs0RFvQ2h9oDGeXMCehptYCtcWkBC1fYob6nrclH8+8cOBy7zmHe65FFw1ztZZ90lUr1F0+Jm8fLOad0mt+5ibk3Tcjj2W4d3iM2dfhlhhsXTQafrs0/HZ5iyxI9aNg4PnqUppBtxQTcdFFQ2ntronasVGLHTP+/cnYyYFh5IxtUF0J48hm/s7I53ianmJ0f4f2+QXkc30Ce3iVrlohdXYqCsDs4jwAWiAwIGg6RwCoFfIoeLw4yq+G03+BdpNiIKCaTvaFU9NJaQbd0vDbJWtVRBeNIYB2KMLw0R7dUAQluglAPXOHA1A7Nl6iYZZ6zrpoFBNxKXld0ntjyeuSrFWR6+116XEMshlmghm/jNLM/JNln3IAAAAASUVORK5CYII="
+            }
+
+            // 以每条数据的id作为obj的key值，数据作为value值存入到一个临时对象里面
+            tmpMap[treeArray[i]["uid"]] = treeArray[i];
+        }
+
+        for (let i = 0, l = treeArray.length; i < l; i++) {
+            let key = tmpMap[treeArray[i]["master"]];
+
+            //循环每一条数据的pid，假如这个临时对象有这个key值，就代表这个key对应的数据有children，需要Push进去
+            if (key) {
+                if (!key["children"]) {
+                    key["children"] = [];
+                    key["children"].push(treeArray[i]);
+                } else {
+                    key["children"].push(treeArray[i]);
+                }
+            } else {
+                //如果没有这个Key值，那就代表没有父级,直接放在最外层
+                r.push(treeArray[i]);
+            }
+        }
+        return r[0]
+    }
+
+    function drawTree() {
+        let json = {{ data|tojson|safe }};
+        let data = null;
+        if (json.length !== 0) {
+            data = arrayToJson(json);
+        } else {
+            return
+        }
+
+        const myChart = echarts.init(document.getElementById('echarts'));
+
+        myChart.setOption({
+            toolbox: {
+                orient: "horizontal",
+                feature: {
+                    saveAsImage: {
+                        show: true,
+                        title: "Save as Image",
+                        name: "image",
+                    }
+                }
+            },
+            tooltip: {
+                enterable: true,
+                backgroundColor: 'rgba(255,255,255,0.8)',
+                borderColor: '#999999',
+                borderRadius: 8,
+                borderWidth: 1,
+                position: function (p) {
+                    return [p[0] + 10, p[1] + 10];
+                },
+                formatter: function (params, ticket, callback) {
+                    return '<a href="https://tjupt.org/userdetails.php?id=' + params['data']['uid'] + '" target="_blank">' + params['data']['name'] + '->进入个人页</a>';
+                },
+                trigger: 'item'
+            },
+            series: [
+                {
+                    type: 'tree',
+                    data: [data],
+                    left: '2%',
+                    right: '2%',
+                    top: '8%',
+                    bottom: '15%',
+                    symbolSize: 12,
+                    initialTreeDepth: -1,
+                    orient: 'vertical',
+                    label: {
+                        normal: {
+                            position: 'top',
+                            rotate: -30,
+                            verticalAlign: 'middle',
+                            align: 'right',
+                            fontSize: 9
+                        }
+                    },
+
+                    leaves: {
+                        label: {
+                            normal: {
+                                position: 'bottom',
+                                rotate: -30,
+                                verticalAlign: 'middle',
+                                align: 'left'
+                            }
+                        }
+                    },
+                    itemStyle: {
+                        borderColor: "#90EE90"
+                    },
+                    expandAndCollapse: true,
+                    animationDuration: 550,
+                    animationDurationUpdate: 750
+                }
+            ]
+        });
+        myChart.on('click', function (params) {
+            resizeTree(myChart);
+        });
+        myChart.on('finished', function (params) {
+            resizeTree(myChart);
+        });
+    }
+
+    function resizeTree(myChart) {
+        //tree自适应，网上抄的代码（直言
+        const nodes = myChart._chartsViews[0]._data._graphicEls;
+        let allNode = 0;
+        for (let index = 0; index < nodes.length; index++) {
+            const node = nodes[index];
+            if (node === undefined) {
+                continue
+            }
+            allNode++;
+        }
+        const height = window.innerHeight;
+        const width = window.innerWidth;
+        const currentHeight = allNode;
+        const currentWidth = 20 * allNode;
+        const newHeight = Math.max(currentHeight, height);
+        const newWidth = Math.max(currentWidth, width);
+        const tree_ele = document.getElementById('echarts');
+        tree_ele.style.height = newHeight + 'px';
+        tree_ele.style.width = newWidth + 'px';
+        myChart.resize();
+    }
+
+    drawTree();
+</script>
+</body>
+</html>
